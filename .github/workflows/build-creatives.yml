@@ -1,0 +1,23 @@
+name: Build ad creatives
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/make_creatives.py
+      - .github/workflows/build-creatives.yml
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pillow
+      - run: python3 tools/make_creatives.py img creative
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add creative
+          git diff --cached --quiet && echo "nothing to commit" || git commit -m "Build Meta ad creatives (feed 4:5, story 9:16)"
+          git push
