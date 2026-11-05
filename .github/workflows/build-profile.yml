@@ -1,0 +1,37 @@
+name: Build profile photo
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/build-profile.yml
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pillow
+      - name: Crop homepage photo (main0006) into 1080x1080 profile options
+        run: |
+          mkdir -p profile
+          curl -fsSL -A "Mozilla/5.0" -o profile/src_main0006.webp https://hd-cctv.co.kr/images/main/main0006.webp
+          python3 - <<'EOF'
+          from PIL import Image, ImageEnhance
+          src = Image.open("profile/src_main0006.webp").convert("RGB")
+          print("source", src.size)
+          crops = {"opt1": (1130, 0, 700), "opt2": (1080, 0, 795), "opt3": (1200, 40, 560)}
+          for name, (x, y, s) in crops.items():
+              im = src.crop((x, y, x + s, y + s)).resize((1080, 1080), Image.LANCZOS)
+              im = ImageEnhance.Sharpness(im).enhance(1.15)
+              im.save(f"profile/profile_{name}.jpg", quality=95)
+          EOF
+          rm profile/src_main0006.webp
+          ls -la profile
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add profile
+          git diff --cached --quiet && echo "nothing to commit" || git commit -m "Profile photo options from homepage photo"
+          git push
