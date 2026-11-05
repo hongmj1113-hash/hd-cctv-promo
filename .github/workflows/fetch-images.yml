@@ -17,13 +17,27 @@ jobs:
           mkdir -p img
           UA="Mozilla/5.0"
           REF="https://1793239861147623.dbcart.net/"
-          dl() { curl -fsSL -A "$UA" -e "$REF" -o "img/$2" "$1"; }
+          # dbcart serves an incomplete certificate chain (curl exit 60). Fetch the missing intermediate
+          # from each server certificate's own AIA "CA Issuers" URL and add it to a bundle, so full
+          # TLS verification stays on.
+          cp /etc/ssl/certs/ca-certificates.crt bundle.pem
+          for host in img16.dbcart.net img18.dbcart.net; do
+            echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null \
+              | openssl x509 > leaf.pem
+            aia=$(openssl x509 -in leaf.pem -noout -text | grep -o 'CA Issuers - URI:[^ ]*' | head -1 | sed 's/CA Issuers - URI://')
+            echo "$host intermediate: $aia"
+            curl -fsSL -o inter.der "$aia"
+            openssl x509 -inform DER -in inter.der -out inter.pem 2>/dev/null || cp inter.der inter.pem
+            cat inter.pem >> bundle.pem
+          done
+          dl() { curl -fsSL --cacert bundle.pem -A "$UA" -e "$REF" -o "img/$2" "$1"; }
           dl https://img16.dbcart.net/fileupload_folder/landing_top_147623_1793586624_0_51923860.gif 01.gif
           dl https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_1_56327198.jpg 02.jpg
           dl https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_2_72267524.jpg 03.jpg
           dl https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_3_65868.jpg 04.jpg
           dl https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_4_14602229.jpg 05.jpg
           dl https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512985_6_882640.jpg 06.jpg
+          rm -f bundle.pem leaf.pem inter.der inter.pem
           ls -la img
           for f in img/*; do file "$f" | grep -Eq 'image|GIF|JPEG' || { echo "not an image: $f"; exit 1; }; done
       - name: Point page at local images
