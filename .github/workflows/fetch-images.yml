@@ -1,0 +1,48 @@
+name: Fetch landing images
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/fetch-images.yml
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download images from dbcart
+        run: |
+          set -e
+          mkdir -p img
+          UA="Mozilla/5.0"
+          REF="https://1793239861147623.dbcart.net/"
+          dl() { curl -fsSL -A "$UA" -e "$REF" -o "img/$2" "$1"; }
+          dl https://img16.dbcart.net/fileupload_folder/landing_top_147623_1793586624_0_51923860.gif 01.gif
+          dl https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_1_56327198.jpg 02.jpg
+          dl https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_2_72267524.jpg 03.jpg
+          dl https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_3_65868.jpg 04.jpg
+          dl https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_4_14602229.jpg 05.jpg
+          dl https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512985_6_882640.jpg 06.jpg
+          ls -la img
+          for f in img/*; do file "$f" | grep -Eq 'image|GIF|JPEG' || { echo "not an image: $f"; exit 1; }; done
+      - name: Point page at local images
+        run: |
+          sed -i \
+            -e 's#https://img16.dbcart.net/fileupload_folder/landing_top_147623_1793586624_0_51923860.gif#img/01.gif#' \
+            -e 's#https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_1_56327198.jpg#img/02.jpg#g' \
+            -e 's#https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_2_72267524.jpg#img/03.jpg#' \
+            -e 's#https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_3_65868.jpg#img/04.jpg#' \
+            -e 's#https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512927_4_14602229.jpg#img/05.jpg#' \
+            -e 's#https://img18.dbcart.net/fileupload_folder/landing_top_147623_1793512985_6_882640.jpg#img/06.jpg#' \
+            index.html
+          # og:image must be an absolute URL
+          sed -i 's#content="img/02.jpg"#content="https://hongmj1113-hash.github.io/hd-cctv-promo/img/02.jpg"#' index.html
+          if grep -q dbcart.net index.html; then echo "dbcart reference left"; grep -n dbcart.net index.html; exit 1; fi
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add img index.html
+          git diff --cached --quiet && echo "nothing to commit" || git commit -m "Host landing images locally (remove dbcart dependency)"
+          git push
