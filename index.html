@@ -176,6 +176,14 @@ UTM_KEYS.forEach(k => {
 });
 if (!utm.utm_source && qs.get('fbclid')) utm.utm_source = 'facebook';
 
+// 메타 fbc 값: _fbc 쿠키 우선, 없으면 주소의 fbclid로 생성
+function getFbc() {
+  const m = document.cookie.match(/(?:^|;\s*)_fbc=([^;]+)/);
+  if (m) return decodeURIComponent(m[1]);
+  const id = qs.get('fbclid');
+  return id ? `fb.1.${Date.now()}.${id}` : '';
+}
+
 // 숫자만 입력, 4자리 채우면 다음 칸으로
 ['p2','p3'].forEach((id, i) => {
   const el = document.getElementById(id);
@@ -215,7 +223,7 @@ form.addEventListener('submit', async ev => {
 
   const body = new URLSearchParams({
     name: v('name'), phone, cameras: v('cameras'), region: v('region'),
-    website: v('website'), page_url: location.href.slice(0, 300), ...utm
+    website: v('website'), page_url: location.href.slice(0, 2000), fbc: getFbc(), ...utm
   });
   try {
     await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', body });
